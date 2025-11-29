@@ -23,6 +23,11 @@ target-version = "py310"
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
+    "ruff>=0.1.0",
+    "black>=23.0.0",
+    "mypy>=1.7.0",
+    "croniter>=2.0.0",
+    "apscheduler>=3.10.0",
     "F",   # pyflakes
     "I",   # isort
     "UP",  # pyupgrade

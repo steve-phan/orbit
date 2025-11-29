@@ -1,0 +1,49 @@
+{
+  "name": "Daily Data Backup",
+  "description": "Scheduled daily backup workflow",
+  "tasks": [
+    {
+      "name": "backup_database",
+      "action_type": "shell_command",
+      "action_payload": {
+        "command": "pg_dump production_db > backup.sql"
+      },
+      "retry_policy": {
+        "max_retries": 3,
+        "initial_delay": 2.0,
+        "backoff_multiplier": 2.0
+      },
+      "timeout_seconds": 300,
+      "dependencies": []
+    },
+    {
+      "name": "upload_to_s3",
+      "action_type": "python_script",
+      "action_payload": {
+        "script": "upload_backup.py"
+      },
+      "retry_policy": {
+        "max_retries": 5,
+        "initial_delay": 1.0,
+        "backoff_multiplier": 2.0
+      },
+      "timeout_seconds": 600,
+      "dependencies": ["backup_database"]
+    },
+    {
+      "name": "send_notification",
+      "action_type": "http_request",
+      "action_payload": {
+        "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+        "method": "POST"
+      },
+      "retry_policy": {
+        "max_retries": 2,
+        "initial_delay": 1.0,
+        "backoff_multiplier": 2.0
+      },
+      "timeout_seconds": 30,
+      "dependencies": ["upload_to_s3"]
+    }
+  ]
+}

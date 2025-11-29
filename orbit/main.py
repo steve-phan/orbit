@@ -4,6 +4,8 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from sqlalchemy.orm import sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from orbit.api.v1.api import api_router
 from orbit.core.config import settings
@@ -14,8 +16,10 @@ from orbit.core.exception_handlers import (
 )
 from orbit.core.exceptions import OrbitException
 from orbit.core.logging import get_logger, setup_logging
-from orbit.db.session import engine
+from orbit.db.session import engine, get_session
 from orbit.models.workflow import SQLModel
+from orbit.models.schedule import WorkflowSchedule  # Import to create table
+from orbit.services.scheduler import scheduler
 
 # Initialize logging
 setup_logging()
@@ -30,8 +34,17 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
     logger.info("Database tables created")
+
+    # Start scheduler
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    await scheduler.start(async_session)
+    logger.info("Workflow scheduler started")
+
     yield
+
     # Shutdown: Close connections
+    await scheduler.stop()
+    logger.info("Workflow scheduler stopped")
     logger.info("Orbit System Shutting Down...")
 
 

@@ -72,6 +72,16 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+# Add rate limiting middleware
+from orbit.core.rate_limit import RateLimitMiddleware
+
+app.add_middleware(
+    RateLimitMiddleware,
+    requests_per_minute=100,  # 100 requests per minute
+    burst_size=150,  # Allow bursts up to 150
+    exclude_paths=["/health", "/api/v1/metrics", "/api/v1/ws"],
+)
+
 
 @app.get("/")
 async def root():

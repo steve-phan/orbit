@@ -12,6 +12,7 @@ from orbit.models.retry_policy import RetryPolicy
 from orbit.services.dag_executor import DAGExecutor
 from orbit.services.websocket_manager import ConnectionManager
 from orbit.core.logging import get_logger
+from orbit.services import metrics
 
 logger = get_logger("services.task_runner")
 
@@ -34,6 +35,8 @@ class TaskRunner:
         Args:
             workflow_id: UUID of the workflow to execute
         """
+        start_time = datetime.utcnow()
+
         # Load workflow with tasks
         statement = (
             select(Workflow)
@@ -42,6 +45,9 @@ class TaskRunner:
         )
         result = await self.session.exec(statement)
         workflow = result.one()
+
+        # Track active workflows
+        metrics.active_workflows.inc()
 
         # Update workflow status
         workflow.status = "running"
@@ -88,6 +94,16 @@ class TaskRunner:
                 {"workflow_id": str(workflow_id), "status": "completed"}
             )
 
+            # Track metrics
+            duration = (datetime.utcnow() - start_time).total_seconds()
+            metrics.workflow_executions_total.labels(
+                workflow_name=workflow.name, status="completed"
+            ).inc()
+            metrics.workflow_duration_seconds.labels(
+                workflow_name=workflow.name
+            ).observe(duration)
+            metrics.active_workflows.dec()
+
         except Exception as e:
             # Mark workflow as failed
             workflow.status = "failed"
@@ -97,6 +113,16 @@ class TaskRunner:
             await self.ws_manager.broadcast(
                 {"workflow_id": str(workflow_id), "status": "failed", "error": str(e)}
             )
+
+            # Track metrics
+            duration = (datetime.utcnow() - start_time).total_seconds()
+            metrics.workflow_executions_total.labels(
+                workflow_name=workflow.name, status="failed"
+            ).inc()
+            metrics.workflow_duration_seconds.labels(
+                workflow_name=workflow.name
+            ).observe(duration)
+            metrics.active_workflows.dec()
             raise
 
     async def _execute_task_with_retry(self, task: Task) -> None:
@@ -145,6 +171,9 @@ class TaskRunner:
                     )
                     raise
 
+                # Track retry
+                metrics.task_retries_total.labels(task_name=task.name).inc()
+
                 # Calculate delay and retry
                 delay = retry_policy.calculate_delay(attempt)
                 logger.info(f"Retrying task {task.name} after {delay:.2f}s")
@@ -189,6 +218,7 @@ class TaskRunner:
         Args:
             task: Task object to execute
         """
+        task_start_time = datetime.utcnow()
         # Update task status to running
         task.status = "running"
         task.updated_at = datetime.utcnow()
@@ -224,6 +254,13 @@ class TaskRunner:
                     "result": result,
                 }
             )
+
+            # Track metrics
+            task_duration = (datetime.utcnow() - task_start_time).total_seconds()
+            metrics.task_executions_total.labels(
+                task_name=task.name, status="completed"
+            ).inc()
+            metrics.task_duration_seconds.labels(task_name=task.name).observe(task_duration)
 
         except asyncio.TimeoutError:
             # Timeout - will be handled by retry logic

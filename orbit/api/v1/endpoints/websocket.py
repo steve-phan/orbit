@@ -1,7 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from orbit.services.websocket_manager import ws_manager
 
 router = APIRouter()
+
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -13,11 +15,10 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Keep connection alive and listen for client messages
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             # Echo back for heartbeat
             await ws_manager.send_personal_message(
-                {"type": "heartbeat", "message": "connected"}, 
-                websocket
+                {"type": "heartbeat", "message": "connected"}, websocket
             )
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)

@@ -1,28 +1,50 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
-from orbit.core.config import settings
+from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from orbit.api.v1.api import api_router
+from orbit.core.config import settings
+from orbit.core.exception_handlers import (
+    http_exception_handler,
+    orbit_exception_handler,
+    validation_exception_handler,
+)
+from orbit.core.exceptions import OrbitException
+from orbit.core.logging import get_logger, setup_logging
 from orbit.db.session import engine
 from orbit.models.workflow import SQLModel
+
+# Initialize logging
+setup_logging()
+logger = get_logger("main")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Connect to DB, etc.
-    print("Orbit System Initializing...")
+    logger.info("Orbit System Initializing...")
     # Create tables for SQLite (for dev convenience)
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+    logger.info("Database tables created")
     yield
     # Shutdown: Close connections
-    print("Orbit System Shutting Down...")
+    logger.info("Orbit System Shutting Down...")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
+
+# Register exception handlers
+app.add_exception_handler(OrbitException, orbit_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
@@ -37,14 +59,16 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
+
 @app.get("/")
 async def root():
     return {
         "message": "Welcome to Orbit",
         "status": "operational",
         "version": "0.1.0",
-        "docs": "/docs"
+        "docs": "/docs",
     }
+
 
 @app.get("/health")
 async def health_check():

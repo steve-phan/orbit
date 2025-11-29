@@ -1,121 +1,135 @@
-import asyncio
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload
-from typing import List
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from orbit.core.dependencies import (
+    get_task_repository,
+    get_workflow_repository,
+    get_workflow_service,
+)
+from orbit.core.exceptions import (
+    DAGValidationError,
+    OrbitException,
+    WorkflowNotFoundError,
+)
+from orbit.core.logging import get_logger
 from orbit.db.session import get_session
-from orbit.models.workflow import Workflow, Task
-from orbit.schemas.workflow import WorkflowCreate, WorkflowRead, TaskCreate
-from orbit.services.dag_executor import DAGExecutor
+from orbit.repositories.workflow_repository import TaskRepository, WorkflowRepository
+from orbit.schemas.workflow import WorkflowCreate, WorkflowRead
 from orbit.services.task_runner import TaskRunner
 from orbit.services.websocket_manager import ws_manager
 
+logger = get_logger("api.workflows")
 router = APIRouter()
 
-@router.post("/", response_model=WorkflowRead)
+
+@router.post("/", response_model=WorkflowRead, status_code=201)
 async def create_workflow(
     workflow_in: WorkflowCreate,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    task_repo: TaskRepository = Depends(get_task_repository),
 ):
-    # 1. Create Workflow
-    workflow = Workflow(name=workflow_in.name, description=workflow_in.description)
-    session.add(workflow)
-    await session.commit()
-    await session.refresh(workflow)
-    
-    # 2. Create Tasks
-    tasks = []
-    for task_in in workflow_in.tasks:
-        task = Task(
-            workflow_id=workflow.id,
-            name=task_in.name,
-            action_type=task_in.action_type,
-            action_payload=task_in.action_payload,
-            dependencies=task_in.dependencies
-        )
-        session.add(task)
-        tasks.append(task)
-    
-    await session.commit()
-    
-    # 3. Validate DAG structure
+    """
+    Create a new workflow with tasks.
+    Validates DAG structure before creation.
+    """
     try:
-        DAGExecutor.validate_dag(tasks)
-    except ValueError as e:
-        # Rollback and return error
-        await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
-    
-    # Reload workflow with tasks
-    statement = select(Workflow).where(Workflow.id == workflow.id).options(selectinload(Workflow.tasks))
-    result = await session.exec(statement)
-    workflow = result.one()
-        
-    return workflow
+        service = get_workflow_service(workflow_repo, task_repo)
+        workflow = await service.create_workflow(workflow_in)
+        return workflow
+    except DAGValidationError as e:
+        logger.warning(f"DAG validation failed: {e.message}")
+        raise HTTPException(status_code=400, detail=e.message)
+    except OrbitException as e:
+        logger.error(f"Failed to create workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
 
-@router.get("/", response_model=List[WorkflowRead])
+
+@router.get("/", response_model=list[WorkflowRead])
 async def read_workflows(
     skip: int = 0,
     limit: int = 100,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    task_repo: TaskRepository = Depends(get_task_repository),
 ):
-    result = await session.exec(select(Workflow).options(selectinload(Workflow.tasks)).offset(skip).limit(limit))
-    workflows = result.all()
-    return workflows
+    """List all workflows with pagination."""
+    try:
+        service = get_workflow_service(workflow_repo, task_repo)
+        workflows = await service.list_workflows(skip=skip, limit=limit)
+        return workflows
+    except OrbitException as e:
+        logger.error(f"Failed to list workflows: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
 
 @router.get("/{workflow_id}", response_model=WorkflowRead)
 async def get_workflow(
     workflow_id: UUID,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    task_repo: TaskRepository = Depends(get_task_repository),
 ):
-    statement = select(Workflow).where(Workflow.id == workflow_id).options(selectinload(Workflow.tasks))
-    result = await session.exec(statement)
-    workflow = result.first()
-    
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    
-    return workflow
+    """Get a specific workflow by ID."""
+    try:
+        service = get_workflow_service(workflow_repo, task_repo)
+        workflow = await service.get_workflow(workflow_id)
+        return workflow
+    except WorkflowNotFoundError as e:
+        logger.warning(f"Workflow not found: {workflow_id}")
+        raise HTTPException(status_code=404, detail=e.message)
+    except OrbitException as e:
+        logger.error(f"Failed to get workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
 
 @router.post("/{workflow_id}/execute")
 async def execute_workflow(
     workflow_id: UUID,
     background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_session),
+    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
+    task_repo: TaskRepository = Depends(get_task_repository),
 ):
-    # Verify workflow exists
-    statement = select(Workflow).where(Workflow.id == workflow_id)
-    result = await session.exec(statement)
-    workflow = result.first()
-    
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    
-    if workflow.status == "running":
-        raise HTTPException(status_code=400, detail="Workflow is already running")
-    
-    # Execute workflow in background
-    background_tasks.add_task(execute_workflow_task, workflow_id)
-    
-    return {
-        "workflow_id": str(workflow_id),
-        "status": "queued",
-        "message": "Workflow execution started"
-    }
+    """Execute a workflow in the background."""
+    try:
+        service = get_workflow_service(workflow_repo, task_repo)
+        workflow = await service.get_workflow(workflow_id)
+
+        if workflow.status == "running":
+            raise HTTPException(status_code=400, detail="Workflow is already running")
+
+        # Execute workflow in background
+        background_tasks.add_task(execute_workflow_task, workflow_id)
+
+        logger.info(f"Queued workflow {workflow_id} for execution")
+
+        return {
+            "workflow_id": str(workflow_id),
+            "status": "queued",
+            "message": "Workflow execution started",
+        }
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except OrbitException as e:
+        logger.error(f"Failed to execute workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
 
 async def execute_workflow_task(workflow_id: UUID):
     """Background task to execute workflow."""
-    from orbit.db.session import engine
-    from sqlmodel.ext.asyncio.session import AsyncSession
     from sqlalchemy.orm import sessionmaker
-    
-    async_session = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
-    
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from orbit.db.session import engine
+
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
     async with async_session() as session:
         runner = TaskRunner(session, ws_manager)
-        await runner.execute_workflow(workflow_id)
+        try:
+            await runner.execute_workflow(workflow_id)
+        except Exception as e:
+            logger.error(f"Workflow execution failed: {e}")

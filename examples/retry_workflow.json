@@ -1,0 +1,54 @@
+{
+  "name": "Resilient Data Pipeline",
+  "description": "Demonstrates retry logic and timeout handling",
+  "tasks": [
+    {
+      "name": "fetch_data_with_retry",
+      "action_type": "http_request",
+      "action_payload": {
+        "url": "https://api.example.com/data"
+      },
+      "retry_policy": {
+        "max_retries": 3,
+        "initial_delay": 1.0,
+        "max_delay": 10.0,
+        "backoff_multiplier": 2.0,
+        "jitter": true
+      },
+      "timeout_seconds": 30,
+      "dependencies": []
+    },
+    {
+      "name": "process_data",
+      "action_type": "python_script",
+      "action_payload": {
+        "script": "process.py"
+      },
+      "retry_policy": {
+        "max_retries": 2,
+        "initial_delay": 2.0,
+        "max_delay": 20.0,
+        "backoff_multiplier": 2.0,
+        "jitter": true
+      },
+      "timeout_seconds": 60,
+      "dependencies": ["fetch_data_with_retry"]
+    },
+    {
+      "name": "save_results",
+      "action_type": "shell_command",
+      "action_payload": {
+        "command": "save_to_db.sh"
+      },
+      "retry_policy": {
+        "max_retries": 5,
+        "initial_delay": 0.5,
+        "max_delay": 30.0,
+        "backoff_multiplier": 2.0,
+        "jitter": true
+      },
+      "timeout_seconds": 45,
+      "dependencies": ["process_data"]
+    }
+  ]
+}

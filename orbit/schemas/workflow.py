@@ -1,5 +1,6 @@
+from typing import List, Optional
 from uuid import UUID
-
+from pydantic import BaseModel
 from orbit.models.workflow import TaskBase, WorkflowBase
 
 
@@ -11,13 +12,14 @@ class TaskRead(TaskBase):
     id: UUID
     workflow_id: UUID
     status: str
+    retry_count: int
 
 
 class WorkflowCreate(WorkflowBase):
-    tasks: list[TaskCreate]
+    tasks: List[TaskCreate]
 
 
 class WorkflowRead(WorkflowBase):
     id: UUID
     status: str
-    tasks: list[TaskRead]
+    tasks: List[TaskRead]

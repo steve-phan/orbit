@@ -1,21 +1,26 @@
 import asyncio
+import json
 from datetime import datetime
-from typing import Any
+from typing import Dict, Any, Optional
 from uuid import UUID
-
-from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from orbit.models.workflow import Task, Workflow
+from orbit.models.workflow import Workflow, Task
+from orbit.models.retry_policy import RetryPolicy
 from orbit.services.dag_executor import DAGExecutor
 from orbit.services.websocket_manager import ConnectionManager
+from orbit.core.logging import get_logger
+
+logger = get_logger("services.task_runner")
 
 
 class TaskRunner:
     """
     Executes tasks based on their dependencies and action types.
     Manages workflow execution state and broadcasts updates.
+    Implements retry logic with exponential backoff and timeout handling.
     """
 
     def __init__(self, session: AsyncSession, ws_manager: ConnectionManager):
@@ -58,7 +63,7 @@ class TaskRunner:
 
                 # Execute all tasks in this level concurrently
                 await asyncio.gather(
-                    *[self._execute_task(task) for task in level_tasks]
+                    *[self._execute_task_with_retry(task) for task in level_tasks]
                 )
 
             # Mark workflow as completed
@@ -81,6 +86,89 @@ class TaskRunner:
             )
             raise
 
+    async def _execute_task_with_retry(self, task: Task) -> None:
+        """
+        Execute a task with retry logic and timeout handling.
+
+        Args:
+            task: Task object to execute
+        """
+        # Parse retry policy
+        retry_policy = RetryPolicy(**task.retry_policy) if task.retry_policy else RetryPolicy()
+
+        last_error = None
+
+        for attempt in range(retry_policy.max_retries + 1):
+            try:
+                # Update retry count
+                task.retry_count = attempt
+                self.session.add(task)
+                await self.session.commit()
+
+                # Execute task with timeout
+                await self._execute_task(task)
+                return  # Success!
+
+            except asyncio.TimeoutError as e:
+                last_error = e
+                logger.warning(
+                    f"Task {task.name} timed out on attempt {attempt + 1}/{retry_policy.max_retries + 1}"
+                )
+
+                if not retry_policy.should_retry(attempt):
+                    # No more retries
+                    task.status = "failed"
+                    task.result = {"error": "Task timed out", "attempts": attempt + 1}
+                    task.updated_at = datetime.utcnow()
+                    self.session.add(task)
+                    await self.session.commit()
+                    await self.ws_manager.broadcast(
+                        {
+                            "task_id": str(task.id),
+                            "task_name": task.name,
+                            "status": "failed",
+                            "error": "timeout",
+                        }
+                    )
+                    raise
+
+                # Calculate delay and retry
+                delay = retry_policy.calculate_delay(attempt)
+                logger.info(f"Retrying task {task.name} after {delay:.2f}s")
+                await asyncio.sleep(delay)
+
+            except Exception as e:
+                last_error = e
+                logger.error(
+                    f"Task {task.name} failed on attempt {attempt + 1}/{retry_policy.max_retries + 1}: {e}"
+                )
+
+                if not retry_policy.should_retry(attempt):
+                    # No more retries
+                    task.status = "failed"
+                    task.result = {"error": str(e), "attempts": attempt + 1}
+                    task.updated_at = datetime.utcnow()
+                    self.session.add(task)
+                    await self.session.commit()
+                    await self.ws_manager.broadcast(
+                        {
+                            "task_id": str(task.id),
+                            "task_name": task.name,
+                            "status": "failed",
+                            "error": str(e),
+                        }
+                    )
+                    raise
+
+                # Calculate delay and retry
+                delay = retry_policy.calculate_delay(attempt)
+                logger.info(f"Retrying task {task.name} after {delay:.2f}s")
+                await asyncio.sleep(delay)
+
+        # If we get here, all retries failed
+        if last_error:
+            raise last_error
+
     async def _execute_task(self, task: Task) -> None:
         """
         Execute a single task based on its action type.
@@ -98,8 +186,16 @@ class TaskRunner:
         )
 
         try:
-            # Execute based on action type
-            result = await self._execute_action(task.action_type, task.action_payload)
+            # Execute with timeout if specified
+            if task.timeout_seconds:
+                result = await asyncio.wait_for(
+                    self._execute_action(task.action_type, task.action_payload),
+                    timeout=task.timeout_seconds,
+                )
+            else:
+                result = await self._execute_action(
+                    task.action_type, task.action_payload
+                )
 
             # Update task with result
             task.status = "completed"
@@ -116,26 +212,19 @@ class TaskRunner:
                 }
             )
 
+        except asyncio.TimeoutError:
+            # Timeout - will be handled by retry logic
+            logger.error(f"Task {task.name} timed out after {task.timeout_seconds}s")
+            raise
+
         except Exception as e:
-            # Mark task as failed
-            task.status = "failed"
-            task.result = {"error": str(e)}
-            task.updated_at = datetime.utcnow()
-            self.session.add(task)
-            await self.session.commit()
-            await self.ws_manager.broadcast(
-                {
-                    "task_id": str(task.id),
-                    "task_name": task.name,
-                    "status": "failed",
-                    "error": str(e),
-                }
-            )
+            # Other errors - will be handled by retry logic
+            logger.error(f"Task {task.name} failed: {e}")
             raise
 
     async def _execute_action(
-        self, action_type: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+        self, action_type: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Execute a task action based on its type.
 
@@ -157,15 +246,19 @@ class TaskRunner:
         else:
             # For demo purposes, simulate execution
             await asyncio.sleep(1)
-            return {"status": "success", "action_type": action_type, "payload": payload}
+            return {
+                "status": "success",
+                "action_type": action_type,
+                "payload": payload,
+            }
 
-    async def _execute_http_request(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_http_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute HTTP request action."""
         # Simulate HTTP request
         await asyncio.sleep(0.5)
         return {"status": "success", "url": payload.get("url"), "simulated": True}
 
-    async def _execute_shell_command(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_shell_command(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute shell command action."""
         # Simulate shell command
         await asyncio.sleep(0.3)
@@ -175,13 +268,13 @@ class TaskRunner:
             "simulated": True,
         }
 
-    async def _execute_python_script(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_python_script(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute Python script action."""
         # Simulate Python script execution
         await asyncio.sleep(0.7)
         return {"status": "success", "script": payload.get("script"), "simulated": True}
 
-    async def _execute_sleep(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _execute_sleep(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute sleep action for testing."""
         duration = payload.get("duration", 1)
         await asyncio.sleep(duration)

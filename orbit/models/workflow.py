@@ -16,6 +16,9 @@ class Workflow(WorkflowBase, table=True):
     status: str = Field(default="pending", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    paused_at: Optional[datetime] = Field(
+        default=None, description="Timestamp when workflow was paused"
+    )
 
     tasks: List["Task"] = Relationship(back_populates="workflow")
 

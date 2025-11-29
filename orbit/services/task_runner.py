@@ -58,6 +58,19 @@ class TaskRunner:
 
             # Execute tasks level by level
             for level in execution_levels:
+                # Check if workflow was paused
+                await self.session.refresh(workflow)
+                if workflow.status == "paused":
+                    logger.info(f"Workflow {workflow_id} was paused, stopping execution")
+                    await self.ws_manager.broadcast(
+                        {
+                            "workflow_id": str(workflow_id),
+                            "status": "paused",
+                            "message": "Workflow paused during execution",
+                        }
+                    )
+                    return
+
                 # Get tasks for this level
                 level_tasks = [task for task in workflow.tasks if task.name in level]
 

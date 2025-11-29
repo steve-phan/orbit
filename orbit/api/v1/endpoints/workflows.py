@@ -19,6 +19,7 @@ from orbit.repositories.workflow_repository import TaskRepository, WorkflowRepos
 from orbit.schemas.workflow import WorkflowCreate, WorkflowRead
 from orbit.services.task_runner import TaskRunner
 from orbit.services.websocket_manager import ws_manager
+from orbit.services.pause_resume import WorkflowControlService
 
 logger = get_logger("api.workflows")
 router = APIRouter()
@@ -133,3 +134,126 @@ async def execute_workflow_task(workflow_id: UUID):
             await runner.execute_workflow(workflow_id)
         except Exception as e:
             logger.error(f"Workflow execution failed: {e}")
+
+
+@router.post("/{workflow_id}/pause")
+async def pause_workflow(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Pause a running or pending workflow.
+    Paused workflows can be resumed later.
+    """
+    try:
+        control_service = WorkflowControlService(session)
+        workflow = await control_service.pause_workflow(workflow_id)
+
+        # Broadcast pause event
+        await ws_manager.broadcast(
+            {
+                "workflow_id": str(workflow_id),
+                "status": "paused",
+                "paused_at": workflow.paused_at.isoformat() if workflow.paused_at else None,
+            }
+        )
+
+        return {
+            "workflow_id": str(workflow_id),
+            "status": "paused",
+            "message": "Workflow paused successfully",
+        }
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OrbitException as e:
+        logger.error(f"Failed to pause workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
+
+@router.post("/{workflow_id}/resume")
+async def resume_workflow(
+    workflow_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Resume a paused workflow.
+    The workflow will continue execution from where it was paused.
+    """
+    try:
+        control_service = WorkflowControlService(session)
+        workflow = await control_service.resume_workflow(workflow_id)
+
+        # Broadcast resume event
+        await ws_manager.broadcast(
+            {"workflow_id": str(workflow_id), "status": "resumed"}
+        )
+
+        # Re-queue workflow for execution
+        background_tasks.add_task(execute_workflow_task, workflow_id)
+
+        return {
+            "workflow_id": str(workflow_id),
+            "status": "resumed",
+            "message": "Workflow resumed successfully",
+        }
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OrbitException as e:
+        logger.error(f"Failed to resume workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
+
+@router.post("/{workflow_id}/cancel")
+async def cancel_workflow(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Cancel a workflow permanently.
+    Cancelled workflows cannot be resumed.
+    """
+    try:
+        control_service = WorkflowControlService(session)
+        workflow = await control_service.cancel_workflow(workflow_id)
+
+        # Broadcast cancel event
+        await ws_manager.broadcast(
+            {"workflow_id": str(workflow_id), "status": "cancelled"}
+        )
+
+        return {
+            "workflow_id": str(workflow_id),
+            "status": "cancelled",
+            "message": "Workflow cancelled successfully",
+        }
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except OrbitException as e:
+        logger.error(f"Failed to cancel workflow: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)
+
+
+@router.get("/{workflow_id}/status")
+async def get_workflow_status(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+):
+    """
+    Get detailed status of a workflow including pause/resume capabilities.
+    """
+    try:
+        control_service = WorkflowControlService(session)
+        status = await control_service.get_workflow_status(workflow_id)
+        return status
+    except WorkflowNotFoundError as e:
+        raise HTTPException(status_code=404, detail=e.message)
+    except OrbitException as e:
+        logger.error(f"Failed to get workflow status: {e.message}")
+        raise HTTPException(status_code=500, detail=e.message)

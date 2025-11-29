@@ -179,18 +179,6 @@ DATABASE_URL=postgresql+asyncpg://orbit:orbit_password@localhost:5432/orbit_db
 - Efficient task scheduling with topological sort
 - Parallel execution of independent tasks
 
-## 🤝 Contributing
-
-This is a production system. Contributions should include:
-- Comprehensive tests
-- Type hints
-- Documentation updates
-- Performance considerations
-
-## 📝 License
-
-MIT License - See LICENSE file for details
-
 ## 🔗 API Documentation
 
 Interactive API documentation available at:

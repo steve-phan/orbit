@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import selectinload
 from typing import List
 
 from orbit.db.session import get_session
@@ -35,9 +36,10 @@ async def create_workflow(
     
     await session.commit()
     
-    # Refresh to get IDs
-    for task in tasks:
-        await session.refresh(task)
+    # Reload workflow with tasks
+    statement = select(Workflow).where(Workflow.id == workflow.id).options(selectinload(Workflow.tasks))
+    result = await session.exec(statement)
+    workflow = result.one()
         
     return workflow
 
@@ -47,6 +49,6 @@ async def read_workflows(
     limit: int = 100,
     session: AsyncSession = Depends(get_session)
 ):
-    result = await session.exec(select(Workflow).offset(skip).limit(limit))
+    result = await session.exec(select(Workflow).options(selectinload(Workflow.tasks)).offset(skip).limit(limit))
     workflows = result.all()
     return workflows

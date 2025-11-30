@@ -5,12 +5,13 @@ Provides manual control over workflow execution.
 
 from datetime import datetime
 from uuid import UUID
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.models.workflow import Workflow
 from orbit.core.exceptions import WorkflowNotFoundError
 from orbit.core.logging import get_logger
+from orbit.models.workflow import Workflow
 
 logger = get_logger("services.pause_resume")
 

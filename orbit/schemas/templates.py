@@ -2,66 +2,67 @@
 Pydantic schemas for workflow templates.
 """
 
-from typing import Optional, Dict, Any, List
-from uuid import UUID
-from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class TemplateParameterSchema(BaseModel):
     """Schema for template parameter definition."""
-    
+
     name: str
     type: str = Field(..., description="Parameter type: string, integer, float, boolean, array, object")
-    description: Optional[str] = None
-    default: Optional[Any] = None
+    description: str | None = None
+    default: Any | None = None
     required: bool = False
-    validation: Optional[Dict[str, Any]] = None
+    validation: dict[str, Any] | None = None
 
 
 class TemplateCreate(BaseModel):
     """Schema for creating a template."""
-    
+
     name: str = Field(..., description="Template name")
     description: str = Field(..., description="Template description")
-    template_data: Dict[str, Any] = Field(..., description="Workflow definition with placeholders")
-    parameters: Optional[Dict[str, Any]] = Field(default={}, description="Parameter definitions")
-    category: Optional[str] = None
-    tags: Optional[List[str]] = Field(default=[])
+    template_data: dict[str, Any] = Field(..., description="Workflow definition with placeholders")
+    parameters: dict[str, Any] | None = Field(default={}, description="Parameter definitions")
+    category: str | None = None
+    tags: list[str] | None = Field(default=[])
 
 
 class TemplateUpdate(BaseModel):
     """Schema for updating a template."""
-    
-    description: Optional[str] = None
-    template_data: Optional[Dict[str, Any]] = None
-    parameters: Optional[Dict[str, Any]] = None
-    category: Optional[str] = None
-    tags: Optional[List[str]] = None
-    is_active: Optional[bool] = None
+
+    description: str | None = None
+    template_data: dict[str, Any] | None = None
+    parameters: dict[str, Any] | None = None
+    category: str | None = None
+    tags: list[str] | None = None
+    is_active: bool | None = None
 
 
 class TemplateRead(BaseModel):
     """Schema for reading a template."""
-    
+
     id: UUID
     name: str
-    description: Optional[str]
-    category: Optional[str]
+    description: str | None
+    category: str | None
     version: str
-    tags: List[str]
+    tags: list[str]
     usage_count: int
-    last_used_at: Optional[datetime]
+    last_used_at: datetime | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class TemplateInstantiate(BaseModel):
     """Schema for instantiating a template."""
-    
-    parameters: Dict[str, Any] = Field(..., description="Parameter values")
-    workflow_name: Optional[str] = Field(None, description="Override workflow name")
+
+    parameters: dict[str, Any] = Field(..., description="Parameter values")
+    workflow_name: str | None = Field(None, description="Override workflow name")

@@ -2,9 +2,9 @@
 Tests for rate limiting functionality.
 """
 
-import pytest
 import time
-from orbit.core.rate_limit import TokenBucket, RateLimiter
+
+from orbit.core.rate_limit import RateLimiter, TokenBucket
 
 
 def test_token_bucket_initialization():

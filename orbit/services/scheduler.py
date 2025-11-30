@@ -4,17 +4,14 @@ Manages periodic workflow execution based on cron schedules.
 """
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import List, Optional
-from uuid import UUID
+from datetime import datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from orbit.core.logging import get_logger
 from orbit.models.schedule import WorkflowSchedule
 from orbit.models.workflow import Workflow
-from orbit.core.logging import get_logger
-from orbit.core.exceptions import WorkflowNotFoundError
 
 logger = get_logger("services.scheduler")
 
@@ -34,7 +31,7 @@ class WorkflowScheduler:
         """
         self.check_interval = check_interval
         self.running = False
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
 
     async def start(self, session_factory) -> None:
         """
@@ -99,7 +96,7 @@ class WorkflowScheduler:
             select(WorkflowSchedule)
             .where(WorkflowSchedule.enabled == True)  # noqa: E712
             .where(
-                (WorkflowSchedule.next_run <= now) | (WorkflowSchedule.next_run == None)
+                (WorkflowSchedule.next_run <= now) | (WorkflowSchedule.next_run.is_(None))
             )
         )
 

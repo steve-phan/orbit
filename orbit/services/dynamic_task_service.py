@@ -4,15 +4,15 @@ Implements map-reduce patterns for parallel processing.
 """
 
 import asyncio
-from typing import List, Dict, Any, Optional
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.models.dynamic_tasks import DynamicTaskGroup
-from orbit.models.workflow import Task
 from orbit.core.logging import get_logger
+from orbit.models.dynamic_tasks import DynamicTaskGroup
 
 logger = get_logger("services.dynamic_tasks")
 
@@ -30,8 +30,8 @@ class DynamicTaskService:
         self,
         workflow_id: UUID,
         parent_task_name: str,
-        items: List[Any],
-        task_template: Dict[str, Any],
+        items: list[Any],
+        task_template: dict[str, Any],
     ) -> DynamicTaskGroup:
         """
         Create a map task group that processes each item in parallel.
@@ -68,7 +68,7 @@ class DynamicTaskService:
         self,
         task_group_id: UUID,
         executor_func: callable,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """
         Execute all tasks in a map group in parallel.
 
@@ -126,8 +126,8 @@ class DynamicTaskService:
         self,
         workflow_id: UUID,
         parent_task_name: str,
-        map_results: List[Any],
-        reduce_template: Dict[str, Any],
+        map_results: list[Any],
+        reduce_template: dict[str, Any],
     ) -> DynamicTaskGroup:
         """
         Create a reduce task that aggregates map results.
@@ -204,13 +204,13 @@ class DynamicTaskService:
         self.session.add(task_group)
         await self.session.commit()
 
-        logger.info(f"Reduce task completed: {parent_task_name}")
+        logger.info(f"Reduce task completed: {task_group.parent_task_name}")
 
         return task_group.results[0] if task_group.results else None
 
     def _interpolate_template(
-        self, template: Dict[str, Any], context: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, template: dict[str, Any], context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Interpolate template with context variables.
         Supports nested properties like {{item.user.id}}.
@@ -243,13 +243,12 @@ class DynamicTaskService:
 
             if value is not None:
                 placeholder = f"{{{{{match}}}}}"
-                value_str = json.dumps(value) if not isinstance(value, (str, int, float, bool)) else str(value)
                 template_str = template_str.replace(f'"{placeholder}"', json.dumps(value))
                 template_str = template_str.replace(placeholder, str(value))
 
         return json.loads(template_str)
 
-    async def get_task_group_status(self, task_group_id: UUID) -> Dict[str, Any]:
+    async def get_task_group_status(self, task_group_id: UUID) -> dict[str, Any]:
         """
         Get status of a dynamic task group.
 

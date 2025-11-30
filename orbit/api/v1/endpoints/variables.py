@@ -3,19 +3,19 @@ API endpoints for workflow variables and secrets.
 """
 
 from uuid import UUID
-from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from orbit.core.logging import get_logger
 from orbit.db.session import get_session
-from orbit.services.variable_service import VariableService
 from orbit.schemas.variables import (
-    VariableCreate,
-    VariableRead,
     SecretCreate,
     SecretRead,
+    VariableCreate,
+    VariableRead,
 )
-from orbit.core.logging import get_logger
+from orbit.services.variable_service import VariableService
 
 logger = get_logger("api.variables")
 router = APIRouter()
@@ -39,7 +39,7 @@ async def create_workflow_variable(
     return variable
 
 
-@router.get("/{workflow_id}/variables", response_model=List[VariableRead])
+@router.get("/{workflow_id}/variables", response_model=list[VariableRead])
 async def get_workflow_variables(
     workflow_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -87,7 +87,7 @@ async def create_workflow_secret(
     )
 
 
-@router.get("/{workflow_id}/secrets", response_model=List[SecretRead])
+@router.get("/{workflow_id}/secrets", response_model=list[SecretRead])
 async def get_workflow_secrets(
     workflow_id: UUID,
     session: AsyncSession = Depends(get_session),

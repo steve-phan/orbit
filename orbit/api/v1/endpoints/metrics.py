@@ -4,6 +4,7 @@ Exposes Prometheus metrics for monitoring.
 """
 
 from fastapi import APIRouter
+
 from orbit.services.metrics import get_metrics
 
 router = APIRouter()

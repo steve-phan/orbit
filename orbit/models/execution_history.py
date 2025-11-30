@@ -4,10 +4,10 @@ Tracks all workflow and task executions for audit and debugging.
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
+
+from sqlalchemy import JSON, Column, Text
 from sqlmodel import Field, SQLModel
-from sqlalchemy import Column, JSON, Text
 
 
 class WorkflowExecution(SQLModel, table=True):
@@ -21,10 +21,10 @@ class WorkflowExecution(SQLModel, table=True):
     workflow_name: str = Field(index=True)
     status: str = Field(index=True)  # queued, running, completed, failed, cancelled
     started_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    completed_at: Optional[datetime] = Field(default=None)
-    duration_seconds: Optional[float] = Field(default=None)
-    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
-    metadata: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    completed_at: datetime | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None)
+    error_message: str | None = Field(default=None, sa_column=Column(Text))
+    metadata: dict | None = Field(default=None, sa_column=Column(JSON))
 
 
 class TaskExecution(SQLModel, table=True):
@@ -42,7 +42,7 @@ class TaskExecution(SQLModel, table=True):
     attempt_number: int = Field(default=0)  # Retry attempt
     status: str = Field(index=True)  # pending, running, completed, failed
     started_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    completed_at: Optional[datetime] = Field(default=None)
-    duration_seconds: Optional[float] = Field(default=None)
-    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
-    result: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    completed_at: datetime | None = Field(default=None)
+    duration_seconds: float | None = Field(default=None)
+    error_message: str | None = Field(default=None, sa_column=Column(Text))
+    result: dict | None = Field(default=None, sa_column=Column(JSON))

@@ -3,6 +3,7 @@ Tests for variables and secrets functionality.
 """
 
 import pytest
+
 from orbit.core.encryption import EncryptionService, encryption_service
 
 

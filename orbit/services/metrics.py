@@ -3,8 +3,14 @@ Prometheus metrics for Orbit.
 Provides observability and monitoring capabilities.
 """
 
-from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi import Response
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 
 # Workflow metrics
 workflow_executions_total = Counter(

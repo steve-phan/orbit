@@ -5,14 +5,15 @@ Prevents duplicate executions and caches results.
 
 import hashlib
 import json
-from typing import Optional, Dict, Any, Tuple
-from uuid import UUID
 from datetime import datetime
+from typing import Any
+from uuid import UUID
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.models.idempotency import IdempotencyKey
 from orbit.core.logging import get_logger
+from orbit.models.idempotency import IdempotencyKey
 
 logger = get_logger("services.idempotency")
 
@@ -30,7 +31,7 @@ class IdempotencyService:
         self,
         workflow_id: UUID,
         task_name: str,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> str:
         """
         Generate idempotency key from workflow, task, and payload.
@@ -45,13 +46,13 @@ class IdempotencyService:
         """
         # Create deterministic key from inputs
         key_parts = [str(workflow_id), task_name]
-        
+
         if payload:
             # Sort payload for deterministic hash
             payload_str = json.dumps(payload, sort_keys=True)
             payload_hash = hashlib.sha256(payload_str.encode()).hexdigest()[:16]
             key_parts.append(payload_hash)
-        
+
         return ":".join(key_parts)
 
     async def check_idempotency(
@@ -59,7 +60,7 @@ class IdempotencyService:
         workflow_id: UUID,
         task_name: str,
         idempotency_key: str,
-    ) -> Tuple[bool, Optional[IdempotencyKey]]:
+    ) -> tuple[bool, IdempotencyKey | None]:
         """
         Check if task has already been executed with this key.
 
@@ -76,34 +77,34 @@ class IdempotencyService:
             IdempotencyKey.task_name == task_name,
             IdempotencyKey.key == idempotency_key,
         )
-        
+
         result = await self.session.exec(statement)
         existing = result.first()
-        
+
         if not existing:
             return False, None
-        
+
         # Check if expired
         if existing.is_expired():
             logger.info(f"Idempotency key expired: {idempotency_key}")
             await self.session.delete(existing)
             await self.session.commit()
             return False, None
-        
+
         # Check status
         if existing.status == "processing":
             logger.info(f"Task already processing: {idempotency_key}")
             return True, existing
-        
+
         if existing.status == "completed":
             logger.info(f"Task already completed, returning cached result: {idempotency_key}")
             return True, existing
-        
+
         if existing.status == "failed":
             logger.info(f"Task previously failed: {idempotency_key}")
             # Allow retry of failed tasks
             return False, existing
-        
+
         return False, None
 
     async def create_idempotency_record(
@@ -111,7 +112,7 @@ class IdempotencyService:
         workflow_id: UUID,
         task_name: str,
         idempotency_key: str,
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         ttl_hours: int = 24,
     ) -> IdempotencyKey:
         """
@@ -132,7 +133,7 @@ class IdempotencyService:
         if payload:
             payload_str = json.dumps(payload, sort_keys=True)
             request_hash = hashlib.sha256(payload_str.encode()).hexdigest()
-        
+
         record = IdempotencyKey(
             workflow_id=workflow_id,
             task_name=task_name,
@@ -140,20 +141,20 @@ class IdempotencyService:
             status="processing",
             request_hash=request_hash,
         )
-        
+
         record.set_ttl(ttl_hours)
-        
+
         self.session.add(record)
         await self.session.commit()
         await self.session.refresh(record)
-        
+
         logger.info(f"Created idempotency record: {idempotency_key}")
         return record
 
     async def mark_completed(
         self,
         idempotency_key_id: UUID,
-        result: Dict[str, Any],
+        result: dict[str, Any],
     ) -> None:
         """
         Mark idempotency record as completed with result.
@@ -165,15 +166,15 @@ class IdempotencyService:
         statement = select(IdempotencyKey).where(IdempotencyKey.id == idempotency_key_id)
         result_obj = await self.session.exec(statement)
         record = result_obj.first()
-        
+
         if record:
             record.status = "completed"
             record.result = result
             record.completed_at = datetime.utcnow()
-            
+
             self.session.add(record)
             await self.session.commit()
-            
+
             logger.info(f"Marked idempotency record as completed: {record.key}")
 
     async def mark_failed(
@@ -191,15 +192,15 @@ class IdempotencyService:
         statement = select(IdempotencyKey).where(IdempotencyKey.id == idempotency_key_id)
         result_obj = await self.session.exec(statement)
         record = result_obj.first()
-        
+
         if record:
             record.status = "failed"
             record.error_message = error_message
             record.completed_at = datetime.utcnow()
-            
+
             self.session.add(record)
             await self.session.commit()
-            
+
             logger.info(f"Marked idempotency record as failed: {record.key}")
 
     async def cleanup_expired(self) -> int:
@@ -213,14 +214,14 @@ class IdempotencyService:
             IdempotencyKey.expires_at.isnot(None),
             IdempotencyKey.expires_at < datetime.utcnow(),
         )
-        
+
         result = await self.session.exec(statement)
         expired = list(result.all())
-        
+
         for record in expired:
             await self.session.delete(record)
-        
+
         await self.session.commit()
-        
+
         logger.info(f"Cleaned up {len(expired)} expired idempotency records")
         return len(expired)

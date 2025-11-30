@@ -1,18 +1,18 @@
 import asyncio
-import json
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Any
 from uuid import UUID
+
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload
 
-from orbit.models.workflow import Workflow, Task
+from orbit.core.logging import get_logger
 from orbit.models.retry_policy import RetryPolicy
+from orbit.models.workflow import Task, Workflow
+from orbit.services import metrics
 from orbit.services.dag_executor import DAGExecutor
 from orbit.services.websocket_manager import ConnectionManager
-from orbit.core.logging import get_logger
-from orbit.services import metrics
 
 logger = get_logger("services.task_runner")
 
@@ -273,8 +273,8 @@ class TaskRunner:
             raise
 
     async def _execute_action(
-        self, action_type: str, payload: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, action_type: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute a task action based on its type.
 
@@ -302,13 +302,13 @@ class TaskRunner:
                 "payload": payload,
             }
 
-    async def _execute_http_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_http_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute HTTP request action."""
         # Simulate HTTP request
         await asyncio.sleep(0.5)
         return {"status": "success", "url": payload.get("url"), "simulated": True}
 
-    async def _execute_shell_command(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_shell_command(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute shell command action."""
         # Simulate shell command
         await asyncio.sleep(0.3)
@@ -318,13 +318,13 @@ class TaskRunner:
             "simulated": True,
         }
 
-    async def _execute_python_script(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_python_script(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute Python script action."""
         # Simulate Python script execution
         await asyncio.sleep(0.7)
         return {"status": "success", "script": payload.get("script"), "simulated": True}
 
-    async def _execute_sleep(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_sleep(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute sleep action for testing."""
         duration = payload.get("duration", 1)
         await asyncio.sleep(duration)

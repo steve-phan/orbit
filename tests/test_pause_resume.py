@@ -2,12 +2,12 @@
 Tests for pause/resume functionality.
 """
 
-import pytest
-from uuid import uuid4
 from datetime import datetime
-from orbit.services.pause_resume import WorkflowControlService
+from uuid import uuid4
+
+import pytest
+
 from orbit.models.workflow import Workflow
-from orbit.core.exceptions import WorkflowNotFoundError
 
 
 @pytest.fixture

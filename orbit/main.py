@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from orbit.api.v1.api import api_router
 from orbit.core.config import settings
@@ -16,9 +16,9 @@ from orbit.core.exception_handlers import (
 )
 from orbit.core.exceptions import OrbitException
 from orbit.core.logging import get_logger, setup_logging
-from orbit.db.session import engine, get_session
+from orbit.core.rate_limit import RateLimitMiddleware
+from orbit.db.session import engine
 from orbit.models.workflow import SQLModel
-from orbit.models.schedule import WorkflowSchedule  # Import to create table
 from orbit.services.scheduler import scheduler
 
 # Initialize logging
@@ -73,8 +73,6 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 # Add rate limiting middleware
-from orbit.core.rate_limit import RateLimitMiddleware
-
 app.add_middleware(
     RateLimitMiddleware,
     requests_per_minute=100,  # 100 requests per minute

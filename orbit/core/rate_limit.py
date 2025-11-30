@@ -4,10 +4,8 @@ Protects API endpoints from abuse and ensures fair resource usage.
 """
 
 import time
-from typing import Dict, Optional
-from collections import defaultdict
-from datetime import datetime, timedelta
-from fastapi import Request, HTTPException
+
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from orbit.core.logging import get_logger
@@ -88,7 +86,7 @@ class RateLimiter:
     def __init__(
         self,
         requests_per_minute: int = 60,
-        burst_size: Optional[int] = None,
+        burst_size: int | None = None,
     ):
         """
         Initialize rate limiter.
@@ -102,7 +100,7 @@ class RateLimiter:
         self.refill_rate = requests_per_minute / 60.0  # Tokens per second
 
         # Store token buckets per client
-        self.buckets: Dict[str, TokenBucket] = {}
+        self.buckets: dict[str, TokenBucket] = {}
 
         # Cleanup old buckets periodically
         self.last_cleanup = time.time()
@@ -173,8 +171,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         app,
         requests_per_minute: int = 60,
-        burst_size: Optional[int] = None,
-        exclude_paths: Optional[list] = None,
+        burst_size: int | None = None,
+        exclude_paths: list | None = None,
     ):
         """
         Initialize rate limit middleware.

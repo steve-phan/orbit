@@ -4,8 +4,8 @@ Uses Fernet symmetric encryption for secure secret storage.
 """
 
 import os
+
 from cryptography.fernet import Fernet
-from typing import Optional
 
 from orbit.core.logging import get_logger
 
@@ -18,7 +18,7 @@ class EncryptionService:
     Uses Fernet symmetric encryption with a key from environment.
     """
 
-    def __init__(self, encryption_key: Optional[str] = None):
+    def __init__(self, encryption_key: str | None = None):
         """
         Initialize encryption service.
 

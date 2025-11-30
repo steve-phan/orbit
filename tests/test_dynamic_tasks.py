@@ -2,9 +2,9 @@
 Tests for dynamic task generation (map-reduce).
 """
 
-import pytest
-from orbit.services.dynamic_task_service import DynamicTaskService
 from uuid import uuid4
+
+from orbit.services.dynamic_task_service import DynamicTaskService
 
 
 def test_template_interpolation():

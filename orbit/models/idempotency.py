@@ -4,10 +4,11 @@ Prevents duplicate task executions and enables result caching.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Any
 from uuid import UUID, uuid4
+
+from sqlalchemy import JSON, Column, Index, Text
 from sqlmodel import Field, SQLModel
-from sqlalchemy import Column, JSON, Text, Index
 
 
 class IdempotencyKey(SQLModel, table=True):
@@ -25,20 +26,20 @@ class IdempotencyKey(SQLModel, table=True):
     workflow_id: UUID = Field(foreign_key="workflow.id", index=True)
     task_name: str = Field(index=True)
     key: str = Field(index=True, description="Idempotency key")
-    
+
     # Execution details
     status: str = Field(default="processing", index=True)  # processing, completed, failed
-    result: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
-    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
-    
+    result: dict[str, Any] | None = Field(default=None, sa_column=Column(JSON))
+    error_message: str | None = Field(default=None, sa_column=Column(Text))
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    completed_at: Optional[datetime] = Field(default=None)
-    expires_at: Optional[datetime] = Field(default=None, index=True)
-    
+    completed_at: datetime | None = Field(default=None)
+    expires_at: datetime | None = Field(default=None, index=True)
+
     # Metadata
-    request_hash: Optional[str] = Field(default=None, description="Hash of request payload")
-    execution_id: Optional[UUID] = Field(default=None, description="Original execution ID")
+    request_hash: str | None = Field(default=None, description="Hash of request payload")
+    execution_id: UUID | None = Field(default=None, description="Original execution ID")
 
     def is_expired(self) -> bool:
         """Check if idempotency key has expired."""

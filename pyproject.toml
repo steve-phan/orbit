@@ -172,6 +172,16 @@ disallow_untyped_defs = false
 line-length = 88
 target-version = "py310"
 
+# Exclude directories
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
 # Enable specific rule sets
 select = [
     "E",   # pycodestyle errors
@@ -189,22 +199,18 @@ ignore = [
     "E501",  # line too long (handled by black)
     "B008",  # do not perform function calls in argument defaults (FastAPI pattern)
     "UP007", # Use X | Y for type annotations (not compatible with Python 3.9)
+    "UP035", # typing.List is deprecated (we'll fix gradually)
+    "B904",  # raise ... from err (we'll fix gradually)
+    "SIM105", # Use contextlib.suppress (we'll fix gradually)
+    "W291",  # trailing whitespace (handled by black)
+    "B017",  # pytest.raises(Exception) is too broad (acceptable in tests)
 ]
 
-# Exclude directories
-exclude = [
-    ".git",
-    ".venv",
-    "__pycache__",
-    "build",
-    "dist",
-]
-
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__.py
 "tests/*" = ["S101"]      # Allow assert in tests
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["orbit"]
 
 # ============================================

@@ -4,10 +4,10 @@ Supports cron-based scheduling for periodic workflow execution.
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID, uuid4
-from sqlmodel import Field, Relationship, SQLModel
+
 from croniter import croniter
+from sqlmodel import Field, SQLModel
 
 
 class WorkflowSchedule(SQLModel, table=True):
@@ -23,16 +23,16 @@ class WorkflowSchedule(SQLModel, table=True):
     )
     timezone: str = Field(default="UTC", description="Timezone for schedule")
     enabled: bool = Field(default=True, index=True, description="Schedule enabled")
-    next_run: Optional[datetime] = Field(
+    next_run: datetime | None = Field(
         default=None, index=True, description="Next scheduled run time"
     )
-    last_run: Optional[datetime] = Field(
+    last_run: datetime | None = Field(
         default=None, description="Last execution time"
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    def calculate_next_run(self, base_time: Optional[datetime] = None) -> datetime:
+    def calculate_next_run(self, base_time: datetime | None = None) -> datetime:
         """
         Calculate the next run time based on cron expression.
 

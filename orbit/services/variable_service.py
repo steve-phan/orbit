@@ -4,19 +4,20 @@ Handles encryption/decryption and variable interpolation.
 """
 
 import re
-from typing import Dict, Any, Optional, List
+from typing import Any
 from uuid import UUID
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.models.variables import (
-    WorkflowVariable,
-    WorkflowSecret,
-    GlobalVariable,
-    GlobalSecret,
-)
 from orbit.core.encryption import encryption_service
 from orbit.core.logging import get_logger
+from orbit.models.variables import (
+    GlobalSecret,
+    GlobalVariable,
+    WorkflowSecret,
+    WorkflowVariable,
+)
 
 logger = get_logger("services.variables")
 
@@ -32,7 +33,7 @@ class VariableService:
 
     # Workflow Variables
     async def create_workflow_variable(
-        self, workflow_id: UUID, key: str, value: str, description: Optional[str] = None
+        self, workflow_id: UUID, key: str, value: str, description: str | None = None
     ) -> WorkflowVariable:
         """Create a workflow variable."""
         variable = WorkflowVariable(
@@ -46,7 +47,7 @@ class VariableService:
 
     async def get_workflow_variables(
         self, workflow_id: UUID
-    ) -> List[WorkflowVariable]:
+    ) -> list[WorkflowVariable]:
         """Get all variables for a workflow."""
         statement = select(WorkflowVariable).where(
             WorkflowVariable.workflow_id == workflow_id
@@ -56,7 +57,7 @@ class VariableService:
 
     async def get_workflow_variable(
         self, workflow_id: UUID, key: str
-    ) -> Optional[WorkflowVariable]:
+    ) -> WorkflowVariable | None:
         """Get a specific workflow variable."""
         statement = select(WorkflowVariable).where(
             WorkflowVariable.workflow_id == workflow_id,
@@ -77,7 +78,7 @@ class VariableService:
 
     # Workflow Secrets
     async def create_workflow_secret(
-        self, workflow_id: UUID, key: str, value: str, description: Optional[str] = None
+        self, workflow_id: UUID, key: str, value: str, description: str | None = None
     ) -> WorkflowSecret:
         """Create an encrypted workflow secret."""
         encrypted_value = encryption_service.encrypt(value)
@@ -93,7 +94,7 @@ class VariableService:
         logger.info(f"Created workflow secret: {key} for workflow {workflow_id}")
         return secret
 
-    async def get_workflow_secrets(self, workflow_id: UUID) -> List[WorkflowSecret]:
+    async def get_workflow_secrets(self, workflow_id: UUID) -> list[WorkflowSecret]:
         """Get all secrets for a workflow (encrypted)."""
         statement = select(WorkflowSecret).where(
             WorkflowSecret.workflow_id == workflow_id
@@ -103,7 +104,7 @@ class VariableService:
 
     async def get_workflow_secret_value(
         self, workflow_id: UUID, key: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get decrypted secret value."""
         statement = select(WorkflowSecret).where(
             WorkflowSecret.workflow_id == workflow_id, WorkflowSecret.key == key
@@ -136,7 +137,7 @@ class VariableService:
 
     # Global Variables
     async def create_global_variable(
-        self, key: str, value: str, description: Optional[str] = None
+        self, key: str, value: str, description: str | None = None
     ) -> GlobalVariable:
         """Create a global variable."""
         variable = GlobalVariable(key=key, value=value, description=description)
@@ -146,7 +147,7 @@ class VariableService:
         logger.info(f"Created global variable: {key}")
         return variable
 
-    async def get_global_variable(self, key: str) -> Optional[GlobalVariable]:
+    async def get_global_variable(self, key: str) -> GlobalVariable | None:
         """Get a global variable."""
         statement = select(GlobalVariable).where(GlobalVariable.key == key)
         result = await self.session.exec(statement)
@@ -154,7 +155,7 @@ class VariableService:
 
     # Variable Interpolation
     async def interpolate_variables(
-        self, text: str, workflow_id: Optional[UUID] = None
+        self, text: str, workflow_id: UUID | None = None
     ) -> str:
         """
         Replace variable placeholders in text with actual values.
@@ -212,8 +213,8 @@ class VariableService:
         return result
 
     async def interpolate_dict(
-        self, data: Dict[str, Any], workflow_id: Optional[UUID] = None
-    ) -> Dict[str, Any]:
+        self, data: dict[str, Any], workflow_id: UUID | None = None
+    ) -> dict[str, Any]:
         """
         Recursively interpolate variables in a dictionary.
 

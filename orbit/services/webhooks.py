@@ -4,10 +4,11 @@ Sends HTTP webhooks on workflow events.
 """
 
 import asyncio
-import httpx
-from typing import Dict, Any, List, Optional
 from datetime import datetime
+from typing import Any
 from uuid import UUID
+
+import httpx
 
 from orbit.core.logging import get_logger
 from orbit.models.retry_policy import RetryPolicy
@@ -28,8 +29,8 @@ class WebhookService:
         self,
         url: str,
         event_type: str,
-        payload: Dict[str, Any],
-        retry_policy: Optional[RetryPolicy] = None,
+        payload: dict[str, Any],
+        retry_policy: RetryPolicy | None = None,
     ) -> bool:
         """
         Send a webhook notification.
@@ -88,8 +89,8 @@ class WebhookService:
         workflow_id: UUID,
         workflow_name: str,
         status: str,
-        webhooks: List[str],
-        additional_data: Optional[Dict[str, Any]] = None,
+        webhooks: list[str],
+        additional_data: dict[str, Any] | None = None,
     ) -> None:
         """
         Send workflow event to configured webhooks.

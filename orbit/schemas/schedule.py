@@ -2,10 +2,10 @@
 Pydantic schemas for workflow schedules.
 """
 
-from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, Field, field_validator
+
 from croniter import croniter
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScheduleCreate(BaseModel):
@@ -31,15 +31,15 @@ class ScheduleCreate(BaseModel):
 class ScheduleUpdate(BaseModel):
     """Schema for updating a workflow schedule."""
 
-    cron_expression: Optional[str] = Field(
+    cron_expression: str | None = Field(
         None, description="Cron expression to update"
     )
-    timezone: Optional[str] = Field(None, description="Timezone to update")
-    enabled: Optional[bool] = Field(None, description="Enable/disable schedule")
+    timezone: str | None = Field(None, description="Timezone to update")
+    enabled: bool | None = Field(None, description="Enable/disable schedule")
 
     @field_validator("cron_expression")
     @classmethod
-    def validate_cron(cls, v: Optional[str]) -> Optional[str]:
+    def validate_cron(cls, v: str | None) -> str | None:
         """Validate cron expression if provided."""
         if v is not None:
             try:
@@ -58,8 +58,8 @@ class ScheduleRead(BaseModel):
     cron_expression: str
     timezone: str
     enabled: bool
-    next_run: Optional[str] = None
-    last_run: Optional[str] = None
+    next_run: str | None = None
+    last_run: str | None = None
 
     class Config:
         from_attributes = True

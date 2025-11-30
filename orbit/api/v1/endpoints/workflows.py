@@ -17,9 +17,9 @@ from orbit.core.logging import get_logger
 from orbit.db.session import get_session
 from orbit.repositories.workflow_repository import TaskRepository, WorkflowRepository
 from orbit.schemas.workflow import WorkflowCreate, WorkflowRead
+from orbit.services.pause_resume import WorkflowControlService
 from orbit.services.task_runner import TaskRunner
 from orbit.services.websocket_manager import ws_manager
-from orbit.services.pause_resume import WorkflowControlService
 
 logger = get_logger("api.workflows")
 router = APIRouter()
@@ -184,7 +184,7 @@ async def resume_workflow(
     """
     try:
         control_service = WorkflowControlService(session)
-        workflow = await control_service.resume_workflow(workflow_id)
+        await control_service.resume_workflow(workflow_id)
 
         # Broadcast resume event
         await ws_manager.broadcast(
@@ -219,7 +219,7 @@ async def cancel_workflow(
     """
     try:
         control_service = WorkflowControlService(session)
-        workflow = await control_service.cancel_workflow(workflow_id)
+        await control_service.cancel_workflow(workflow_id)
 
         # Broadcast cancel event
         await ws_manager.broadcast(

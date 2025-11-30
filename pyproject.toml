@@ -37,6 +37,7 @@ dependencies = [
     
     # Data Validation
     "pydantic>=2.5.0",
+    "pydantic-settings>=2.0.0",  # Settings management
     
     # Scheduling
     "croniter>=2.0.0",

@@ -1,0 +1,46 @@
+name: Code Quality
+
+# Run on push to master and on pull requests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      
+      # Check code formatting with Black
+      - name: Check formatting (Black)
+        run: |
+          black --check .
+      
+      # Lint with Ruff
+      - name: Lint (Ruff)
+        run: |
+          ruff check .
+      
+      # Type check with MyPy (optional, can be strict)
+      - name: Type check (MyPy)
+        run: |
+          mypy orbit/ --ignore-missing-imports
+        continue-on-error: true  # Don't fail build on type errors (for now)

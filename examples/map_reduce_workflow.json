@@ -1,0 +1,57 @@
+{
+  "name": "Batch Image Processing",
+  "description": "Process multiple images in parallel using map-reduce",
+  "tasks": [
+    {
+      "name": "fetch_image_list",
+      "action_type": "http_request",
+      "action_payload": {
+        "url": "https://api.example.com/images",
+        "method": "GET"
+      },
+      "dependencies": []
+    },
+    {
+      "name": "process_images_map",
+      "action_type": "map",
+      "action_payload": {
+        "items_from_task": "fetch_image_list",
+        "task_template": {
+          "name": "process_image_{{index}}",
+          "action_type": "python_script",
+          "action_payload": {
+            "script": "process_image.py",
+            "image_url": "{{item.url}}",
+            "image_id": "{{item.id}}"
+          },
+          "retry_policy": {
+            "max_retries": 2,
+            "initial_delay": 1.0
+          },
+          "timeout_seconds": 60
+        }
+      },
+      "dependencies": ["fetch_image_list"]
+    },
+    {
+      "name": "aggregate_results_reduce",
+      "action_type": "reduce",
+      "action_payload": {
+        "results_from_task": "process_images_map",
+        "reduce_function": "aggregate_image_results",
+        "output_path": "/results/summary.json"
+      },
+      "dependencies": ["process_images_map"]
+    },
+    {
+      "name": "upload_summary",
+      "action_type": "http_request",
+      "action_payload": {
+        "url": "https://api.example.com/results",
+        "method": "POST",
+        "body_from_task": "aggregate_results_reduce"
+      },
+      "dependencies": ["aggregate_results_reduce"]
+    }
+  ]
+}

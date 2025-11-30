@@ -1,0 +1,80 @@
+{
+  "name": "ETL Pipeline Template",
+  "description": "Extract, Transform, Load pipeline with configurable sources and destinations",
+  "category": "data-processing",
+  "tags": ["etl", "data", "pipeline"],
+  "parameters": {
+    "source_url": {
+      "type": "string",
+      "description": "Source data URL",
+      "required": true
+    },
+    "destination_url": {
+      "type": "string",
+      "description": "Destination URL",
+      "required": true
+    },
+    "batch_size": {
+      "type": "integer",
+      "description": "Batch size for processing",
+      "default": 100,
+      "validation": {
+        "min": 1,
+        "max": 1000
+      }
+    },
+    "transform_script": {
+      "type": "string",
+      "description": "Transformation script name",
+      "default": "default_transform.py"
+    }
+  },
+  "template_data": {
+    "name": "ETL Pipeline",
+    "description": "Extract, Transform, Load workflow",
+    "tasks": [
+      {
+        "name": "extract",
+        "action_type": "http_request",
+        "action_payload": {
+          "url": "{{source_url}}",
+          "method": "GET"
+        },
+        "retry_policy": {
+          "max_retries": 3,
+          "initial_delay": 2.0
+        },
+        "timeout_seconds": 60,
+        "dependencies": []
+      },
+      {
+        "name": "transform",
+        "action_type": "python_script",
+        "action_payload": {
+          "script": "{{transform_script}}",
+          "batch_size": "{{batch_size}}"
+        },
+        "retry_policy": {
+          "max_retries": 2,
+          "initial_delay": 1.0
+        },
+        "timeout_seconds": 300,
+        "dependencies": ["extract"]
+      },
+      {
+        "name": "load",
+        "action_type": "http_request",
+        "action_payload": {
+          "url": "{{destination_url}}",
+          "method": "POST"
+        },
+        "retry_policy": {
+          "max_retries": 5,
+          "initial_delay": 1.0
+        },
+        "timeout_seconds": 120,
+        "dependencies": ["transform"]
+      }
+    ]
+  }
+}

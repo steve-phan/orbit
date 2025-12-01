@@ -4,10 +4,11 @@ Enables version control for workflow definitions with rollback capability.
 """
 
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any
 from uuid import UUID, uuid4
-from sqlmodel import Field, SQLModel, Relationship
-from sqlalchemy import Column, JSON, Text
+
+from sqlalchemy import JSON, Column, Text
+from sqlmodel import Field, SQLModel
 
 
 class WorkflowVersion(SQLModel, table=True):
@@ -20,30 +21,30 @@ class WorkflowVersion(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     workflow_id: UUID = Field(foreign_key="workflow.id", index=True)
-    
+
     # Version information
     version_number: int = Field(index=True, description="Sequential version number")
-    version_tag: Optional[str] = Field(default=None, description="Optional version tag (e.g., 'v1.0.0')")
-    
+    version_tag: str | None = Field(default=None, description="Optional version tag (e.g., 'v1.0.0')")
+
     # Workflow definition snapshot
     name: str
-    description: Optional[str] = Field(default=None, sa_column=Column(Text))
-    workflow_data: Dict[str, Any] = Field(sa_column=Column(JSON), description="Complete workflow definition")
-    
+    description: str | None = Field(default=None, sa_column=Column(Text))
+    workflow_data: dict[str, Any] = Field(sa_column=Column(JSON), description="Complete workflow definition")
+
     # Change tracking
-    change_summary: Optional[str] = Field(default=None, sa_column=Column(Text))
-    changed_by: Optional[str] = Field(default=None, description="User who made the change")
-    
+    change_summary: str | None = Field(default=None, sa_column=Column(Text))
+    changed_by: str | None = Field(default=None, description="User who made the change")
+
     # Status
     is_active: bool = Field(default=False, description="Currently active version")
     is_draft: bool = Field(default=False, description="Draft version (not deployed)")
-    
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-    activated_at: Optional[datetime] = Field(default=None)
-    
+    activated_at: datetime | None = Field(default=None)
+
     # Metadata
-    checksum: Optional[str] = Field(default=None, description="SHA256 hash of workflow_data")
+    checksum: str | None = Field(default=None, description="SHA256 hash of workflow_data")
 
 
 class WorkflowChangeLog(SQLModel, table=True):
@@ -56,14 +57,14 @@ class WorkflowChangeLog(SQLModel, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     workflow_id: UUID = Field(foreign_key="workflow.id", index=True)
-    from_version: Optional[int] = Field(default=None, description="Previous version number")
+    from_version: int | None = Field(default=None, description="Previous version number")
     to_version: int = Field(description="New version number")
-    
+
     # Change details
     change_type: str = Field(description="Type: created, updated, rolled_back, deleted")
-    changes: Dict[str, Any] = Field(sa_column=Column(JSON), description="Detailed diff of changes")
-    
+    changes: dict[str, Any] = Field(sa_column=Column(JSON), description="Detailed diff of changes")
+
     # Metadata
-    changed_by: Optional[str] = Field(default=None)
-    change_reason: Optional[str] = Field(default=None, sa_column=Column(Text))
+    changed_by: str | None = Field(default=None)
+    change_reason: str | None = Field(default=None, sa_column=Column(Text))
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

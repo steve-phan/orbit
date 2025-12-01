@@ -4,7 +4,7 @@ JWT authentication and authorization utilities.
 
 import secrets
 from datetime import datetime, timedelta
-from typing import Optional, List
+
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -34,7 +34,7 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(
     data: dict,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """
     Create JWT access token.
@@ -47,26 +47,26 @@ def create_access_token(
         Encoded JWT token
     """
     to_encode = data.copy()
-    
+
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     to_encode.update({"exp": expire, "type": "access"})
-    
+
     encoded_jwt = jwt.encode(
         to_encode,
         settings.SECRET_KEY,
         algorithm=ALGORITHM,
     )
-    
+
     return encoded_jwt
 
 
 def create_refresh_token(
     data: dict,
-    expires_delta: Optional[timedelta] = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
     """
     Create JWT refresh token.
@@ -79,24 +79,24 @@ def create_refresh_token(
         Encoded JWT token
     """
     to_encode = data.copy()
-    
+
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    
+
     to_encode.update({"exp": expire, "type": "refresh"})
-    
+
     encoded_jwt = jwt.encode(
         to_encode,
         settings.SECRET_KEY,
         algorithm=ALGORITHM,
     )
-    
+
     return encoded_jwt
 
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict | None:
     """
     Decode and verify JWT token.
 
@@ -126,28 +126,28 @@ def generate_api_key() -> tuple[str, str]:
         Tuple of (full_key, key_hash)
     """
     import hashlib
-    
+
     # Generate random key (32 bytes = 64 hex chars)
     key = secrets.token_urlsafe(32)
-    
+
     # Use SHA256 for API keys (bcrypt has 72-byte limit)
     key_hash = hashlib.sha256(key.encode()).hexdigest()
-    
+
     return key, key_hash
 
 
 def verify_api_key(plain_key: str, key_hash: str) -> bool:
     """Verify an API key against its hash."""
     import hashlib
-    
+
     # Use SHA256 for API keys
     computed_hash = hashlib.sha256(plain_key.encode()).hexdigest()
     return secrets.compare_digest(computed_hash, key_hash)
 
 
 def check_permissions(
-    user_roles: List[str],
-    required_roles: List[str],
+    user_roles: list[str],
+    required_roles: list[str],
 ) -> bool:
     """
     Check if user has required roles.
@@ -161,13 +161,13 @@ def check_permissions(
     """
     if "admin" in user_roles:
         return True
-    
+
     return any(role in user_roles for role in required_roles)
 
 
 def check_scopes(
-    user_scopes: List[str],
-    required_scopes: List[str],
+    user_scopes: list[str],
+    required_scopes: list[str],
 ) -> bool:
     """
     Check if user has required scopes.
@@ -181,5 +181,5 @@ def check_scopes(
     """
     if "*" in user_scopes:
         return True
-    
+
     return all(scope in user_scopes for scope in required_scopes)

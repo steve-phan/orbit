@@ -5,15 +5,16 @@ Manages version control for workflows with rollback capability.
 
 import hashlib
 import json
-from typing import List, Dict, Any, Optional, Tuple
-from uuid import UUID
 from datetime import datetime
-from sqlmodel import select, desc
+from typing import Any
+from uuid import UUID
+
+from sqlmodel import desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.models.versioning import WorkflowVersion, WorkflowChangeLog
-from orbit.models.workflow import Workflow
 from orbit.core.logging import get_logger
+from orbit.models.versioning import WorkflowChangeLog, WorkflowVersion
+from orbit.models.workflow import Workflow
 
 logger = get_logger("services.versioning")
 
@@ -27,14 +28,14 @@ class VersioningService:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def _calculate_checksum(self, workflow_data: Dict[str, Any]) -> str:
+    def _calculate_checksum(self, workflow_data: dict[str, Any]) -> str:
         """Calculate SHA256 checksum of workflow data."""
         data_str = json.dumps(workflow_data, sort_keys=True)
         return hashlib.sha256(data_str.encode()).hexdigest()
 
     def _calculate_diff(
-        self, old_data: Optional[Dict[str, Any]], new_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, old_data: dict[str, Any] | None, new_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Calculate differences between two workflow definitions.
 
@@ -70,9 +71,9 @@ class VersioningService:
     async def create_version(
         self,
         workflow: Workflow,
-        change_summary: Optional[str] = None,
-        changed_by: Optional[str] = None,
-        version_tag: Optional[str] = None,
+        change_summary: str | None = None,
+        changed_by: str | None = None,
+        version_tag: str | None = None,
         is_draft: bool = False,
     ) -> WorkflowVersion:
         """
@@ -174,7 +175,7 @@ class VersioningService:
 
     async def get_version(
         self, workflow_id: UUID, version_number: int
-    ) -> Optional[WorkflowVersion]:
+    ) -> WorkflowVersion | None:
         """Get a specific version of a workflow."""
         statement = select(WorkflowVersion).where(
             WorkflowVersion.workflow_id == workflow_id,
@@ -183,7 +184,7 @@ class VersioningService:
         result = await self.session.exec(statement)
         return result.first()
 
-    async def get_active_version(self, workflow_id: UUID) -> Optional[WorkflowVersion]:
+    async def get_active_version(self, workflow_id: UUID) -> WorkflowVersion | None:
         """Get the currently active version of a workflow."""
         statement = select(WorkflowVersion).where(
             WorkflowVersion.workflow_id == workflow_id,
@@ -197,7 +198,7 @@ class VersioningService:
         workflow_id: UUID,
         include_drafts: bool = False,
         limit: int = 50,
-    ) -> List[WorkflowVersion]:
+    ) -> list[WorkflowVersion]:
         """
         List all versions of a workflow.
 
@@ -226,8 +227,8 @@ class VersioningService:
         self,
         workflow_id: UUID,
         version_number: int,
-        changed_by: Optional[str] = None,
-    ) -> Tuple[Workflow, WorkflowVersion]:
+        changed_by: str | None = None,
+    ) -> tuple[Workflow, WorkflowVersion]:
         """
         Rollback workflow to a specific version.
 
@@ -290,7 +291,7 @@ class VersioningService:
 
     async def get_change_log(
         self, workflow_id: UUID, limit: int = 50
-    ) -> List[WorkflowChangeLog]:
+    ) -> list[WorkflowChangeLog]:
         """Get change log for a workflow."""
         statement = (
             select(WorkflowChangeLog)
@@ -304,7 +305,7 @@ class VersioningService:
 
     async def compare_versions(
         self, workflow_id: UUID, version_a: int, version_b: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Compare two versions of a workflow.
 

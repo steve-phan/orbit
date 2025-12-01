@@ -3,23 +3,23 @@ API endpoints for workflow versioning.
 """
 
 from uuid import UUID
-from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.db.session import get_session
-from orbit.services.versioning_service import VersioningService
-from orbit.repositories.workflow_repository import WorkflowRepository
 from orbit.core.dependencies import get_workflow_repository
+from orbit.core.logging import get_logger
+from orbit.db.session import get_session
+from orbit.repositories.workflow_repository import WorkflowRepository
 from orbit.schemas.versioning import (
-    VersionCreate,
-    VersionRead,
-    VersionListItem,
-    VersionRollback,
     ChangeLogRead,
     VersionCompare,
+    VersionCreate,
+    VersionListItem,
+    VersionRead,
+    VersionRollback,
 )
-from orbit.core.logging import get_logger
+from orbit.services.versioning_service import VersioningService
 
 logger = get_logger("api.versioning")
 router = APIRouter()
@@ -34,14 +34,14 @@ async def create_version(
 ):
     """
     Create a new version of a workflow.
-    
+
     This captures the current state of the workflow as a version.
     """
     # Get workflow
     workflow = await workflow_repo.get_by_id(workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    
+
     # Create version
     versioning_service = VersioningService(session)
     version = await versioning_service.create_version(
@@ -51,11 +51,11 @@ async def create_version(
         version_tag=version_in.version_tag,
         is_draft=version_in.is_draft,
     )
-    
+
     return version
 
 
-@router.get("/{workflow_id}/versions", response_model=List[VersionListItem])
+@router.get("/{workflow_id}/versions", response_model=list[VersionListItem])
 async def list_versions(
     workflow_id: UUID,
     include_drafts: bool = Query(default=False),
@@ -69,7 +69,7 @@ async def list_versions(
         include_drafts=include_drafts,
         limit=limit,
     )
-    
+
     return versions
 
 
@@ -81,10 +81,10 @@ async def get_active_version(
     """Get the currently active version of a workflow."""
     versioning_service = VersioningService(session)
     version = await versioning_service.get_active_version(workflow_id)
-    
+
     if not version:
         raise HTTPException(status_code=404, detail="No active version found")
-    
+
     return version
 
 
@@ -97,10 +97,10 @@ async def get_version(
     """Get a specific version of a workflow."""
     versioning_service = VersioningService(session)
     version = await versioning_service.get_version(workflow_id, version_number)
-    
+
     if not version:
         raise HTTPException(status_code=404, detail="Version not found")
-    
+
     return version
 
 
@@ -112,25 +112,25 @@ async def rollback_version(
 ):
     """
     Rollback workflow to a specific version.
-    
+
     This creates a new version that restores the workflow to a previous state.
     """
     versioning_service = VersioningService(session)
-    
+
     try:
         workflow, new_version = await versioning_service.rollback_to_version(
             workflow_id=workflow_id,
             version_number=rollback_in.version_number,
             changed_by=rollback_in.changed_by,
         )
-        
+
         return new_version
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/{workflow_id}/changelog", response_model=List[ChangeLogRead])
+@router.get("/{workflow_id}/changelog", response_model=list[ChangeLogRead])
 async def get_changelog(
     workflow_id: UUID,
     limit: int = Query(default=50, le=100),
@@ -139,7 +139,7 @@ async def get_changelog(
     """Get change log for a workflow."""
     versioning_service = VersioningService(session)
     changelog = await versioning_service.get_change_log(workflow_id, limit=limit)
-    
+
     return changelog
 
 
@@ -152,19 +152,19 @@ async def compare_versions(
 ):
     """Compare two versions of a workflow."""
     versioning_service = VersioningService(session)
-    
+
     try:
         differences = await versioning_service.compare_versions(
             workflow_id=workflow_id,
             version_a=version_a,
             version_b=version_b,
         )
-        
+
         return VersionCompare(
             version_a=version_a,
             version_b=version_b,
             differences=differences,
         )
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -24,7 +24,7 @@ class WorkflowExecution(SQLModel, table=True):
     completed_at: datetime | None = Field(default=None)
     duration_seconds: float | None = Field(default=None)
     error_message: str | None = Field(default=None, sa_column=Column(Text))
-    metadata: dict | None = Field(default=None, sa_column=Column(JSON))
+    extra_data: dict | None = Field(default=None, sa_column=Column(JSON))
 
 
 class TaskExecution(SQLModel, table=True):

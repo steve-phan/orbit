@@ -47,3 +47,15 @@ class ConfigurationError(OrbitException):
     """Raised when configuration is invalid."""
 
     pass
+
+
+class UserNotFoundError(OrbitException):
+    """Raised when a user is not found."""
+
+    pass
+
+
+class AuthenticationError(OrbitException):
+    """Raised when authentication fails."""
+
+    pass

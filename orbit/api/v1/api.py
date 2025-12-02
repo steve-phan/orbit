@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from orbit.api.v1.endpoints import (
+    auth,
     history,
     metrics,
     schedules,
@@ -12,6 +13,7 @@ from orbit.api.v1.endpoints import (
 )
 
 api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(workflows.router, prefix="/workflows", tags=["workflows"])
 api_router.include_router(schedules.router, prefix="/workflows", tags=["schedules"])
 api_router.include_router(variables.router, prefix="/workflows", tags=["variables"])

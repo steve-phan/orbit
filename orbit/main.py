@@ -18,6 +18,7 @@ from orbit.core.exceptions import OrbitException
 from orbit.core.logging import get_logger, setup_logging
 from orbit.core.rate_limit import RateLimitMiddleware
 from orbit.db.session import engine
+from orbit.models import auth  # noqa: F401
 from orbit.models.workflow import SQLModel
 from orbit.services.scheduler import scheduler
 

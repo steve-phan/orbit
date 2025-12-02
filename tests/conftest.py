@@ -8,7 +8,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.core.config import settings
 from orbit.db.session import get_session
 from orbit.main import app
 
@@ -28,16 +27,16 @@ def event_loop():
 async def session_fixture() -> AsyncGenerator[AsyncSession, None]:
     """Create a new database session for a test."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False, future=True)
-    
+
     # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
+
     async with async_session() as session:
         yield session
-    
+
     # Drop tables
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.drop_all)
@@ -46,13 +45,14 @@ async def session_fixture() -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture(name="client")
 async def client_fixture(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create a new test client."""
-    
+    from httpx import ASGITransport
+
     def get_session_override():
         return session
 
     app.dependency_overrides[get_session] = get_session_override
-    
-    async with AsyncClient(app=app, base_url="http://test") as client:
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
-    
+
     app.dependency_overrides.clear()

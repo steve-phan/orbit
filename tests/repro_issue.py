@@ -1,7 +1,8 @@
-from fastapi import FastAPI
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
+from fastapi import FastAPI
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 app = FastAPI()
 

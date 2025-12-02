@@ -3,11 +3,6 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.core.dependencies import (
-    get_task_repository,
-    get_workflow_repository,
-    get_workflow_service,
-)
 from orbit.core.exceptions import (
     DAGValidationError,
     OrbitException,
@@ -29,15 +24,16 @@ router = APIRouter()
 async def create_workflow(
     workflow_in: WorkflowCreate,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
-    task_repo: TaskRepository = Depends(get_task_repository),
 ):
     """
     Create a new workflow with tasks.
     Validates DAG structure before creation.
     """
     try:
-        service = get_workflow_service(workflow_repo, task_repo)
+        workflow_repo = WorkflowRepository(session)
+        task_repo = TaskRepository(session)
+        from orbit.services.workflow_service import WorkflowService
+        service = WorkflowService(workflow_repo, task_repo)
         workflow = await service.create_workflow(workflow_in)
         return workflow
     except DAGValidationError as e:
@@ -53,12 +49,13 @@ async def read_workflows(
     skip: int = 0,
     limit: int = 100,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
-    task_repo: TaskRepository = Depends(get_task_repository),
 ):
     """List all workflows with pagination."""
     try:
-        service = get_workflow_service(workflow_repo, task_repo)
+        workflow_repo = WorkflowRepository(session)
+        task_repo = TaskRepository(session)
+        from orbit.services.workflow_service import WorkflowService
+        service = WorkflowService(workflow_repo, task_repo)
         workflows = await service.list_workflows(skip=skip, limit=limit)
         return workflows
     except OrbitException as e:
@@ -70,12 +67,13 @@ async def read_workflows(
 async def get_workflow(
     workflow_id: UUID,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
-    task_repo: TaskRepository = Depends(get_task_repository),
 ):
     """Get a specific workflow by ID."""
     try:
-        service = get_workflow_service(workflow_repo, task_repo)
+        workflow_repo = WorkflowRepository(session)
+        task_repo = TaskRepository(session)
+        from orbit.services.workflow_service import WorkflowService
+        service = WorkflowService(workflow_repo, task_repo)
         workflow = await service.get_workflow(workflow_id)
         return workflow
     except WorkflowNotFoundError as e:
@@ -91,12 +89,13 @@ async def execute_workflow(
     workflow_id: UUID,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
-    task_repo: TaskRepository = Depends(get_task_repository),
 ):
     """Execute a workflow in the background."""
     try:
-        service = get_workflow_service(workflow_repo, task_repo)
+        workflow_repo = WorkflowRepository(session)
+        task_repo = TaskRepository(session)
+        from orbit.services.workflow_service import WorkflowService
+        service = WorkflowService(workflow_repo, task_repo)
         workflow = await service.get_workflow(workflow_id)
 
         if workflow.status == "running":

@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.core.dependencies import get_workflow_repository
 from orbit.core.logging import get_logger
 from orbit.db.session import get_session
 from orbit.repositories.workflow_repository import WorkflowRepository
@@ -30,7 +29,6 @@ async def create_version(
     workflow_id: UUID,
     version_in: VersionCreate,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
 ):
     """
     Create a new version of a workflow.
@@ -38,6 +36,7 @@ async def create_version(
     This captures the current state of the workflow as a version.
     """
     # Get workflow
+    workflow_repo = WorkflowRepository(session)
     workflow = await workflow_repo.get_by_id(workflow_id)
     if not workflow:
         raise HTTPException(status_code=404, detail="Workflow not found")

@@ -25,14 +25,14 @@ async def get_current_user(
 ) -> User:
     """
     Get current authenticated user from JWT token.
-    
+
     Args:
         token: JWT access token
         session: Database session
-        
+
     Returns:
         User object
-        
+
     Raises:
         HTTPException: If token is invalid or user not found
     """
@@ -41,12 +41,12 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     # Decode token
     payload = decode_token(token)
     if payload is None:
         raise credentials_exception
-    
+
     # Check token type
     if payload.get("type") != "access":
         raise HTTPException(
@@ -54,12 +54,12 @@ async def get_current_user(
             detail="Invalid token type",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Get user ID from token
     user_id: str | None = payload.get("user_id")
     if user_id is None:
         raise credentials_exception
-    
+
     # Get user from database
     user_repo = UserRepository(session)
     try:
@@ -67,13 +67,13 @@ async def get_current_user(
         user = await user_repo.get_by_id(UUID(user_id))
     except (UserNotFoundError, ValueError):
         raise credentials_exception
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive user",
         )
-    
+
     return user
 
 
@@ -82,13 +82,13 @@ async def get_current_active_user(
 ) -> User:
     """
     Get current active user.
-    
+
     Args:
         current_user: Current user from token
-        
+
     Returns:
         User object
-        
+
     Raises:
         HTTPException: If user is inactive
     """
@@ -105,13 +105,13 @@ async def get_current_superuser(
 ) -> User:
     """
     Get current superuser.
-    
+
     Args:
         current_user: Current user from token
-        
+
     Returns:
         User object
-        
+
     Raises:
         HTTPException: If user is not a superuser
     """
@@ -126,21 +126,21 @@ async def get_current_superuser(
 def require_roles(required_roles: list[str]):
     """
     Dependency to check if user has required roles.
-    
+
     Args:
         required_roles: List of required roles
-        
+
     Returns:
         Dependency function
     """
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         from orbit.core.auth import check_permissions
-        
+
         if not check_permissions(current_user.roles, required_roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Required roles: {', '.join(required_roles)}",
             )
         return current_user
-    
+
     return role_checker

@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.core.dependencies import get_task_repository, get_workflow_repository
 from orbit.core.logging import get_logger
 from orbit.db.session import get_session
 from orbit.repositories.workflow_repository import TaskRepository, WorkflowRepository
@@ -85,8 +84,6 @@ async def instantiate_template(
     template_id: UUID,
     instantiate_in: TemplateInstantiate,
     session: AsyncSession = Depends(get_session),
-    workflow_repo: WorkflowRepository = Depends(get_workflow_repository),
-    task_repo: TaskRepository = Depends(get_task_repository),
 ):
     """
     Instantiate a template to create a workflow.
@@ -104,8 +101,10 @@ async def instantiate_template(
         )
 
         # Create workflow using workflow service
-        from orbit.core.dependencies import get_workflow_service
-        workflow_service = get_workflow_service(workflow_repo, task_repo)
+        workflow_repo = WorkflowRepository(session)
+        task_repo = TaskRepository(session)
+        from orbit.services.workflow_service import WorkflowService
+        workflow_service = WorkflowService(workflow_repo, task_repo)
         workflow = await workflow_service.create_workflow(workflow_create)
 
         return workflow

@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from orbit.core.dependencies import get_auth_service, get_user_repository
 from orbit.core.exceptions import AuthenticationError
 from orbit.core.logging import get_logger
 from orbit.core.middleware import get_current_user
